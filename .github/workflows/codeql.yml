@@ -1,4 +1,5 @@
 name: CodeQL analysis
+run-name: "CodeQL analysis ${{ inputs.leg || github.event_name }} ${{ inputs.racecar_run }}"
 
 # **What it does**: This runs CodeQL on our repository.
 # **Why we have it**: Security scanning.
@@ -14,6 +15,24 @@ on:
     branches:
       - main
 
+  workflow_dispatch:
+    inputs:
+      leg:
+        description: "baseline (uninstrumented) or instrumented (under chalk/curiosity)"
+        type: choice
+        options: [instrumented, baseline]
+        default: baseline
+      profile:
+        description: "CrashOverride chalk profile"
+        type: string
+        default: curiosity-tests-racecar
+      racecar_run:
+        description: "racecar correlation token, echoed into the run name"
+        type: string
+        default: ""
+
+env:
+  CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 permissions:
   actions: read
   contents: read
@@ -32,6 +51,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: github/codeql-action/init@e296a935590eb16afc0c0108289f68c87e2a89a5 # v4.30.7
+        continue-on-error: true   # racecar: scan/report step, must not fail the build
         with:
           languages: javascript # comma separated list of values from {go, python, javascript, java, cpp, csharp, ruby}
       - uses: github/codeql-action/analyze@e296a935590eb16afc0c0108289f68c87e2a89a5 # v4.30.7
@@ -44,6 +64,7 @@ jobs:
           token: ${{ secrets.DOCS_BOT_PAT_BASE }}
 
       - uses: ./.github/actions/slack-alert
+        continue-on-error: true   # racecar: scan/report step, must not fail the build
         if: ${{ failure() && github.event_name != 'pull_request' }}
         with:
           slack_token: ${{ secrets.SLACK_DOCS_BOT_TOKEN }}
